@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-color-scheme=dark, maximum-scale=1.0, user-scalable=no">
+  <title>絶望要塞 タイミング計算機 (カメラ録画版)</title>
+  <style>
+    :root {
+      --bg-color: #0d0204;
+      --panel-bg: #140508;
+      --border-color: #ff1e56;
+      --text-color: #ffffff;
+      --text-muted: #ffa3b6;
+      --shadow-color: rgba(255, 30, 86, 0.4);
+      --voice-active: #00ffcc;
+      --adjust-color: #ffea00;
+      --rec-color: #ff0000;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: 'Impact', 'Consolas', 'Courier New', monospace, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 15px;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 440px;
+      margin-top: 10px;
+    }
+
+    .panel {
+      background-color: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      padding: 20px 15px;
+      position: relative;
+      box-shadow: 0 0 15px var(--shadow-color);
+    }
+
+    .panel::before, .panel::after {
+      content: "";
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border: 2px solid var(--border-color);
+    }
+    .panel::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+    .panel::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 15px;
+    }
+
+    .logo-main {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -1px;
+      line-height: 0.9;
+      text-shadow: 3px 3px 0px #000, -1px -1px 0px #ff1e56;
+      font-style: italic;
+    }
+
+    .logo-sub {
+      background: #1a0206;
+      border: 1px solid #ff1e56;
+      color: #ff1e56;
+      font-size: 0.75rem;
+      font-weight: bold;
+      letter-spacing: 5px;
+      padding: 2px 0;
+      margin-top: 5px;
+      display: inline-block;
+      width: 90%;
+      box-shadow: 0 0 8px rgba(255, 30, 86, 0.4);
+    }
+
+    /* カメラエリアのスタイル */
+    .camera-container {
+      width: 100%;
+      margin-bottom: 20px;
+      border: 1px solid var(--border-color);
+      background: #000;
+      position: relative;
+      overflow: hidden;
+      aspect-ratio: 4 / 3;
+    }
+
+    #camera-view {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .camera-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 1px dashed rgba(255, 30, 86, 0.3);
+      padding-bottom: 15px;
+    }
+
+    .camera-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: bold;
+      padding: 12px 0;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+
+    .camera-btn.recording {
+      background: rgba(255, 0, 0, 0.2);
+      border-color: var(--rec-color);
+      color: var(--rec-color);
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.4);
+      animation: blink 1s infinite alternate;
+    }
+
+    @keyframes blink {
+      0% { opacity: 1; }
+      100% { opacity: 0.6; }
+    }
+
+    .voice-control {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 1px dashed rgba(255, 30, 86, 0.3);
+      padding-bottom: 15px;
+    }
+
+    .voice-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: bold;
+      padding: 12px 0;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+
+    .voice-btn#voice-start.listening {
+      background: rgba(0, 255, 204, 0.15);
+      border-color: var(--voice-active);
+      color: var(--voice-active);
+      box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+    }
+
+    .status-text {
+      grid-column: span 2;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 5px;
+      height: 15px;
+    }
+
+    .label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .label::before { content: "▶ "; color: var(--border-color); }
+    .label .sub-counter { font-size: 0.75rem; color: var(--border-color); font-weight: normal; }
+
+    .form-group { margin-bottom: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .input-with-btn { display: flex; gap: 8px; }
+
+    input[type="number"] {
+      width: 100%;
+      background: #000000;
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+      font-size: 1.3rem;
+      padding: 10px;
+      text-align: center;
+      outline: none;
+    }
+    input[type="number"]:focus { background: #1f050b; box-shadow: 0 0 10px var(--border-color); }
+
+    .segment-control { display: flex; border: 1px solid var(--border-color); background: #000000; }
+    .segment-btn {
+      flex: 1; background: transparent; border: none; color: var(--text-muted);
+      font-size: 1.1rem; padding: 12px 0; cursor: pointer; font-weight: bold;
+    }
+    .segment-btn:not(:last-child) { border-right: 1px solid var(--border-color); }
+    .segment-btn.active { background: var(--border-color); color: #000000; }
+
+    .action-btn {
+      background: transparent; border: 1px solid var(--border-color); color: var(--border-color);
+      font-size: 1rem; font-weight: bold; padding: 0 15px; cursor: pointer;
+    }
+    .action-btn:active { background: var(--border-color); color: #000000; }
+
+    .reset-btn {
+      width: 100%; background: rgba(255, 30, 86, 0.1); border: 1px solid var(--border-color);
+      color: var(--text-color); font-size: 1.1rem; font-weight: bold; padding: 12px 0; cursor: pointer;
+    }
+    .reset-btn:active { background: var(--border-color); color: #000000; }
+
+    .results-container { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 25px; }
+    .result-box {
+      border: 1px solid var(--border-color); background: rgba(255, 30, 86, 0.05);
+      padding: 12px; text-align: center; box-shadow: inset 0 0 15px rgba(255, 30, 86, 0.1);
+    }
+    .result-box.adjust-box { border-color: var(--adjust-color); background: rgba(255, 234, 0, 0.03); }
+
+    .result-title { font-size: 0.75rem; color: var(--text-muted); letter-spacing: 2px; margin-bottom: 3px; }
+    .adjust-box .result-title { color: var(--adjust-color); }
+    .result-value {
+      font-size: 2.8rem; font-weight: bold; color: var(--text-color);
+      text-shadow: 0 0 12px var(--border-color); line-height: 1; margin: 8px 0;
+    }
+    .adjust-box .result-value { font-size: 1.8rem; text-shadow: 0 0 8px var(--adjust-color); }
+
+    /* クリアモーダル */
+    .clear-modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background-color: #ffffff; z-index: 9999; justify-content: center; align-items: center;
+    }
+    .clear-content { text-align: center; color: #333333; font-family: sans-serif; }
+    .clear-title { font-size: 2rem; font-weight: bold; margin-bottom: 25px; }
+    .clear-sub { font-size: 1.6rem; font-weight: bold; }
+    .close-btn {
+      position: absolute; top: 20px; left: 20px; width: 40px; height: 40px;
+      background: transparent; border: none; cursor: pointer; display: flex; justify-content: center; align-items: center;
+    }
+    .close-btn::before, .close-btn::after { content: ''; position: absolute; width: 25px; height: 3px; background-color: #333333; }
+    .close-btn::before { transform: rotate(45deg); }
+    .close-btn::after { transform: rotate(-45deg); }
+  </style>
+</head>
+<body>
+
+<div id="clearScreen" class="clear-modal">
+  <button class="close-btn" onclick="closeClearScreen()"></button>
+  <div class="clear-content">
+    <div class="clear-title">[GAMEクリア]</div>
+    <div class="clear-sub">こんぐらっちゅれいしょん</div>
+  </div>
+</div>
+
+<div class="wrapper">
+  <div class="panel">
+    
+    <div class="header">
+      <div class="logo-main">绝望要塞</div>
+      <div class="logo-sub">CAMERA RECORDING VER.</div>
+    </div>
+
+    <!-- カメラプレビュー表示エリア -->
+    <div class="camera-container">
+      <video id="camera-view" autoplay playsinline muted></video>
+    </div>
+
+    <!-- ビデオ撮影コントロール -->
+    <div class="camera-controls">
+      <button id="rec-start" class="camera-btn" onclick="startRecording()">REC START</button>
+      <button id="rec-stop" class="camera-btn" onclick="stopRecording()">REC STOP</button>
+      <div id="camera-status" class="status-text">CAMERA: READY</div>
+    </div>
+
+    <!-- 音声コントロール -->
+    <div class="voice-control">
+      <button id="voice-start" class="voice-btn" onclick="startVoiceRecognition()">VOICE START</button>
+      <button id="voice-stop" class="voice-btn" onclick="stopVoiceRecognition()">VOICE STOP</button>
+      <div id="voice-status" class="status-text">VOICE SYSTEM: STANDBY</div>
+    </div>
+
+    <!-- 以降、計算機能フォーム（前バージョンと同一） -->
+    <div class="form-group">
+      <div class="label"><div>表面：落とした秒数 / 突破秒数</div></div>
+      <div class="grid-3">
+        <input type="number" id="input1" inputmode="decimal" step="0.01" oninput="calculate(false)" placeholder="0.00">
+        <input type="number" id="input2" inputmode="decimal" step="0.01" oninput="calculate(false)" placeholder="0.00">
+        <input type="number" id="input3" inputmode="decimal" step="0.01" oninput="calculate(false)" placeholder="0.00">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <div class="label"><div>突破球数</div></div>
+      <div class="segment-control">
+        <button class="segment-btn active" id="mode1" onclick="changeMode(1)">1球</button>
+        <button class="segment-btn" id="mode2" onclick="changeMode(2)">2球</button>
+        <button class="segment-btn" id="mode3" onclick="changeMode(3)">3球</button>
+      </div>
+      <input type="hidden" id="mode" value="1">
+    </div>
+
+    <div class="form-group">
+      <div class="label"><div>裏面/球目</div></div>
+      <div class="segment-control">
+        <button class="segment-btn active" id="target_n1" onclick="changeTargetN(1)">1</button>
+        <button class="segment-btn" id="target_n2" onclick="changeTargetN(2)">2</button>
+        <button class="segment-btn" id="target_n3" onclick="changeTargetN(3)">3</button>
+        <button class="segment-btn" id="target_n4" onclick="changeTargetN(4)">4</button>
+        <button class="segment-btn" id="target_n5" onclick="changeTargetN(5)">5</button>
+      </div>
+      <input type="hidden" id="n" value="1">
+    </div>
+
+    <div class="form-group">
+      <div class="label">
+        <div>裏面：ロス秒数</div>
+        <div class="sub-counter" id="accumulated-display">STOCKED: 0.00s</div>
+      </div>
+      <div class="input-with-btn">
+        <input type="number" id="w" inputmode="decimal" step="0.01" oninput="calculate(false)" placeholder="0.00">
+        <button class="action-btn" onclick="addLoss()">+ADD</button>
+      </div>
+    </div>
+
+    <div class="results-container">
+      <div class="result-box adjust-box">
+        <div class="result-title">NEXT TARGET ADJUST (FOR 2.50s)</div>
+        <div class="result-value" id="adjust-output">0.00 秒</div>
+      </div>
+      <div class="result-box">
+        <div class="result-title">TARGET TIMING</div>
+        <div class="result-value" id="output">0.00 秒</div>
+      </div>
+    </div>
+
+    <div class="reset-btn-wrapper" style="margin-top:20px;">
+      <button class="reset-btn" onclick="allReset()">ALL RESET</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let accumulatedLoss = 0.0;
+  let frontSpeakCount = 0;
+  let isVoiceActive = false;
+  
+  // カメラ・録画用変数
+  let mediaStream = null;
+  let mediaRecorder = null;
+  let recordedChunks = [];
+
+  // ページ読み込み時に背面のメインカメラを起動する
+  window.addEventListener('DOMContentLoaded', async () => {
+    const video = document.getElementById('camera-view');
+    try {
+      // 背面カメラ(environment)を指定してストリームを取得
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false // ゲーム音などを拾う場合はここをtrueにしますが負荷低減のため一旦falseにしています
+      });
+      video.srcObject = mediaStream;
+    } catch (err) {
+      console.error("Camera error:", err);
+      document.getElementById('camera-status').innerHTML = "CAMERA ERROR: CANNOT ACCESS";
+    }
+  });
+
+  // 録画開始
+  function startRecording() {
+    if (!mediaStream) {
+      alert("カメラが準備できていません。");
+      return;
+    }
+    recordedChunks = [];
+    
+    // 一般的なMIMEタイプを選択
+    let options = { mimeType: 'video/webm;codecs=vp9' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options = { mimeType: 'video/mp4' };
+    }
+
+    try {
+      mediaRecorder = new MediaRecorder(mediaStream, options);
+    } catch (e) {
+      mediaRecorder = new MediaRecorder(mediaStream); // フォールバック
+    }
+
+    mediaRecorder.ondataavailable = function(e) {
+      if (e.data && e.data.size > 0) {
+        recordedChunks.push(e.data);
+      }
+    };
+
+    mediaRecorder.onstop = function() {
+      // 録画停止時に自動でダウンロード用リンクを生成して叩く
+      const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      document.body.appendChild(a);
+      a.style = 'display: none';
+      a.href = url;
+      // ファイル名にタイムスタンプを付与
+      const now = new Date();
+      const timeStr = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + "_" + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+      a.download = `breakout_play_${timeStr}.mp4`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.getElementById('camera-status').innerHTML = "VIDEO DOWNLOADED";
+      document.getElementById('rec-start').classList.remove('recording');
+    };
+
+    mediaRecorder.start();
+    document.getElementById('rec-start').classList.add('recording');
+    document.getElementById('camera-status').innerHTML = "● RECORDING...";
+  }
+
+  // 録画停止
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
+  }
+
+  // 以下、音声認識と計算処理（前バージョンと同一）
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'ja-JP';
+    recognition.interimResults = false;
+    recognition.continuous = true;
+
+    recognition.onresult = function(event) {
+      const lastIndex = event.results.length - 1;
+      const speechText = event.results[lastIndex][0].transcript.trim();
+      document.getElementById('voice-status').innerHTML = "HEARD: \"" + speechText + "\"";
+      parseSpeech(speechText);
+    };
+
+    recognition.onend = function() {
+      if (isVoiceActive) recognition.start();
+      else {
+        document.getElementById('voice-status').innerHTML = "VOICE SYSTEM: STANDBY";
+        document.getElementById('voice-start').classList.remove('listening');
+      }
+    };
+
+    recognition.onerror = function() {
+      if (isVoiceActive) document.getElementById('voice-status').innerHTML = "ERROR: RETRY...";
+    };
+  }
+
+  function startVoiceRecognition() {
+    if (!recognition) return;
+    isVoiceActive = true;
+    document.getElementById('voice-start').classList.add('listening');
+    document.getElementById('voice-status').innerHTML = "VOICE SYSTEM: LISTENING...";
+    recognition.start();
+    speakText("音声入力を開始します");
+  }
+
+  function stopVoiceRecognition() {
+    if (!recognition) return;
+    isVoiceActive = false;
+    document.getElementById('voice-start').classList.remove('listening');
+    recognition.stop();
+    speakText("音声入力を終了します");
+    allReset(); 
+  }
+
+  function parseSpeech(text) {
+    let normalized = text.toLowerCase().replace(/点|てん/g, '.').replace(/[０-９]/g, function(s) {
+      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+    }).replace(/ー|〜/g, '');
+
+    if (normalized.includes("クリアした") || normalized.includes("くりあした")) {
+      showClearScreen();
+      return;
+    }
+
+    const numberMatch = normalized.match(/\d+(\.\d+)?/);
+    if (!numberMatch) { speakText("もういちど"); return; }
+    const value = parseFloat(numberMatch[0]);
+
+    if (normalized.includes("表") || normalized.includes("おもて")) {
+      frontSpeakCount++;
+      if (frontSpeakCount === 1) document.getElementById('input1').value = value.toFixed(2);
+      else if (frontSpeakCount === 2) document.getElementById('input2').value = value.toFixed(2);
+      else document.getElementById('input3').value = value.toFixed(2);
+
+      const isClear = normalized.includes("突破") || normalized.includes("とっぱ") || frontSpeakCount >= 3;
+      if (!isClear) {
+        if (frontSpeakCount === 1) changeMode(2); 
+        else if (frontSpeakCount === 2) changeMode(3); 
+      } else {
+        if (frontSpeakCount === 1) changeMode(1);
+        if (frontSpeakCount === 2) changeMode(2);
+        if (frontSpeakCount === 3) changeMode(3);
+      }
+      calculate(true, 'front', isClear);
+    } 
+    else if (normalized.includes("裏") || normalized.includes("うら")) {
+      const currentN = parseInt(document.getElementById('n').value) || 1;
+      if (currentN < 5) changeTargetN(currentN + 1);
+      document.getElementById('w').value = value;
+      addLoss(true); 
+    } else {
+      speakText("もういちど");
+    }
+  }
+
+  function speakText(msg) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const uttr = new (window.SpeechSynthesisUtterance || window.webkitSpeechSynthesisUtterance)(msg);
+    uttr.lang = 'ja-JP'; uttr.rate = 1.2;
+    window.speechSynthesis.speak(uttr);
+  }
+
+  function playClearSound() {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext(); const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99]; const durations = [0.1, 0.1, 0.25]; const delays = [0, 0.12, 0.24];
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.type = 'sine'; osc.frequency.setValueAtTime(freq, now + delays[idx]);
+      gain.gain.setValueAtTime(0.2, now + delays[idx]);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delays[idx] + durations[idx]);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now + delays[idx]); osc.stop(now + delays[idx] + durations[idx]);
+    });
+  }
+
+  function showClearScreen() {
+    document.getElementById('clearScreen').style.display = 'flex';
+    playClearSound();
+    setTimeout(() => { speakText("ゲームクリア コングラチュレーション"); }, 400);
+  }
+
+  function closeClearScreen() {
+    document.getElementById('clearScreen').style.display = 'none';
+    allReset();
+  }
+
+  function changeMode(val) {
+    document.getElementById('mode').value = val;
+    for (let i = 1; i <= 3; i++) document.getElementById('mode' + i).classList.toggle('active', i === val);
+    calculate(false);
+  }
+
+  function changeTargetN(val) {
+    document.getElementById('n').value = val;
+    for (let i = 1; i <= 5; i++) document.getElementById('target_n' + i).classList.toggle('active', i === val);
+    calculate(false);
+  }
+
+  function addLoss(isFromVoice = false) {
+    const currentInput = parseFloat(document.getElementById('w').value) || 0.0;
+    accumulatedLoss += currentInput;
+    document.getElementById('accumulated-display').innerHTML = "STOCKED: " + accumulatedLoss.toFixed(2) + "s";
+    document.getElementById('w').value = "";
+    calculate(isFromVoice, 'rear', false);
+  }
+
+  function allReset() {
+    document.getElementById('input1').value = ""; document.getElementById('input2').value = ""; document.getElementById('input3').value = ""; document.getElementById('w').value = "";
+    accumulatedLoss = 0.0; frontSpeakCount = 0;
+    document.getElementById('accumulated-display').innerHTML = "STOCKED: 0.00s";
+    changeMode(1); changeTargetN(1); calculate(false);
+  }
+
+  function calculate(shouldSpeak = false, triggerType = '', isClear = false) {
+    const num1 = parseFloat(document.getElementById('input1').value) || 0;
+    const num2 = parseFloat(document.getElementById('input2').value) || 0;
+    const num3 = parseFloat(document.getElementById('input3').value) || 0;
+    const mode = parseInt(document.getElementById('mode').value) || 1;
+    const n = parseInt(document.getElementById('n').value) || 1;
+    const currentWInput = parseFloat(document.getElementById('w').value) || 0;
+    const totalW = accumulatedLoss + currentWInput;
+
+    const S = num1 + num2 + num3;
+    let t_base = (mode === 1) ? 3.0 : (mode === 2) ? 4.5 : 6.0;
+
+    let t = (t_base - S) % 10; if (t < 0) t += 10;
+    let t2 = t + 1.5 * (n - 1) - totalW; t2 = ((t2 % 10) + 10) % 10;
+
+    const t2_display = t2.toFixed(2);
+    document.getElementById('output').innerHTML = t2_display + " 秒";
+
+    let targetS = (mode === 1) ? 0.5 : (mode === 2) ? 2.0 : 3.5;
+    let requiredNext = (targetS - S) % 10; if (requiredNext < 0) requiredNext += 10;
+    
+    const adjust_display = requiredNext.toFixed(2);
+    document.getElementById('adjust-output').innerHTML = adjust_display + " 秒";
+
+    if (shouldSpeak) {
+      if (triggerType === 'front') {
+        if (isClear) speakText(t2_display + "秒です");
+        else speakText(adjust_display + "秒で突破してください");
+      } else if (triggerType === 'rear') {
+        speakText(t2_display + "秒です");
+      }
+    }
+  }
+
+  calculate(false);
+</script>
+</body>
+</html>
