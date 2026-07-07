@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-color-scheme=dark, maximum-scale=1.0, user-scalable=no">
-  <title>絶望要塞 タイミング計算機 (カメラ録画版)</title>
+  <title>絶望要塞 タイミング計算機 (撮影特化版)</title>
   <style>
     :root {
       --bg-color: #0d0204;
@@ -32,12 +32,14 @@
       justify-content: center;
       align-items: flex-start;
       min-height: 100vh;
+      overflow-x: hidden;
     }
 
     .wrapper {
       width: 100%;
       max-width: 440px;
       margin-top: 10px;
+      transition: opacity 0.3s;
     }
 
     .panel {
@@ -89,56 +91,23 @@
       box-shadow: 0 0 8px rgba(255, 30, 86, 0.4);
     }
 
-    /* カメラエリアのスタイル */
-    .camera-container {
+    /* 撮影モード起動ボタン */
+    .mode-launch-btn {
       width: 100%;
-      margin-bottom: 20px;
-      border: 1px solid var(--border-color);
-      background: #000;
-      position: relative;
-      overflow: hidden;
-      aspect-ratio: 4 / 3;
-    }
-
-    #camera-view {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .camera-controls {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 20px;
-      border-bottom: 1px dashed rgba(255, 30, 86, 0.3);
-      padding-bottom: 15px;
-    }
-
-    .camera-btn {
-      background: transparent;
-      border: 1px solid var(--border-color);
-      color: var(--text-muted);
-      font-size: 0.9rem;
+      background: linear-gradient(135deg, #ff1e56 0%, #b3002d 100%);
+      border: none;
+      color: #fff;
+      font-size: 1.2rem;
       font-weight: bold;
-      padding: 12px 0;
+      padding: 15px 0;
+      margin-bottom: 20px;
       cursor: pointer;
       letter-spacing: 1px;
+      box-shadow: 0 0 15px rgba(255, 30, 86, 0.6);
+      text-shadow: 1px 1px 2px #000;
     }
 
-    .camera-btn.recording {
-      background: rgba(255, 0, 0, 0.2);
-      border-color: var(--rec-color);
-      color: var(--rec-color);
-      box-shadow: 0 0 10px rgba(255, 0, 0, 0.4);
-      animation: blink 1s infinite alternate;
-    }
-
-    @keyframes blink {
-      0% { opacity: 1; }
-      100% { opacity: 0.6; }
-    }
-
+    /* 音声コントロール */
     .voice-control {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -238,6 +207,102 @@
     }
     .adjust-box .result-value { font-size: 1.8rem; text-shadow: 0 0 8px var(--adjust-color); }
 
+    /* 全画面撮影モードのレイアウト */
+    .fullscreen-camera-view {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      z-index: 5000;
+    }
+
+    #camera-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* 画面いっぱいに表示 */
+    }
+
+    /* 撮影モード中のオーバーレイUI */
+    .camera-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* 下のビデオやボタンを邪魔しない */
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 15px;
+    }
+
+    .overlay-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: auto;
+    }
+
+    .overlay-close-btn {
+      width: 36px;
+      height: 36px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      color: #fff;
+      font-size: 1.2rem;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .overlay-rec-btn {
+      background: rgba(255, 0, 70, 0.8);
+      border: 2px solid #fff;
+      color: white;
+      font-weight: bold;
+      padding: 10px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      letter-spacing: 1px;
+    }
+    .overlay-rec-btn.recording {
+      background: rgba(0, 0, 0, 0.6);
+      border-color: var(--rec-color);
+      color: var(--rec-color);
+      animation: blink 1s infinite alternate;
+    }
+
+    .overlay-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    /* 撮影中に邪魔にならない位置に計算結果を表示 */
+    .mini-status-box {
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-align: left;
+    }
+    .mini-status-box .title { font-size: 0.6rem; color: var(--text-muted); }
+    .mini-status-box .value { font-size: 1.3rem; font-weight: bold; color: #fff; text-shadow: 0 0 5px var(--border-color); }
+    
+    .mini-voice-box {
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid var(--voice-active);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      color: var(--voice-active);
+    }
+
+    @keyframes blink { 0% { opacity: 1; } 100% { opacity: 0.4; } }
+
     /* クリアモーダル */
     .clear-modal {
       display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -257,6 +322,7 @@
 </head>
 <body>
 
+<!-- クリアモーダル画面 -->
 <div id="clearScreen" class="clear-modal">
   <button class="close-btn" onclick="closeClearScreen()"></button>
   <div class="clear-content">
@@ -265,25 +331,34 @@
   </div>
 </div>
 
-<div class="wrapper">
+<!-- 全画面撮影モードレイアウト -->
+<div id="cameraModeScreen" class="fullscreen-camera-view">
+  <video id="camera-video" autoplay playsinline muted></video>
+  <div class="camera-overlay">
+    <div class="overlay-top">
+      <button class="overlay-close-btn" onclick="closeCameraMode()">✕</button>
+      <button id="overlay-rec-toggle" class="overlay-rec-btn" onclick="toggleRecording()">REC START</button>
+    </div>
+    <div class="overlay-bottom">
+      <div class="mini-status-box">
+        <div class="title">TARGET TIMING</div>
+        <div id="mini-output" class="value">0.00 秒</div>
+      </div>
+      <div id="mini-voice-status" class="mini-voice-box">VOICE: ACTIVE</div>
+    </div>
+  </div>
+</div>
+
+<div class="wrapper" id="main-ui">
   <div class="panel">
     
     <div class="header">
       <div class="logo-main">绝望要塞</div>
-      <div class="logo-sub">CAMERA RECORDING VER.</div>
+      <div class="logo-sub">PREMIUM CAMERA VER.</div>
     </div>
 
-    <!-- カメラプレビュー表示エリア -->
-    <div class="camera-container">
-      <video id="camera-view" autoplay playsinline muted></video>
-    </div>
-
-    <!-- ビデオ撮影コントロール -->
-    <div class="camera-controls">
-      <button id="rec-start" class="camera-btn" onclick="startRecording()">REC START</button>
-      <button id="rec-stop" class="camera-btn" onclick="stopRecording()">REC STOP</button>
-      <div id="camera-status" class="status-text">CAMERA: READY</div>
-    </div>
+    <!-- ⚡ 撮影特化モード起動ボタン ⚡ -->
+    <button class="mode-launch-btn" onclick="launchCameraMode()">LAUNCH CAMERA MODE</button>
 
     <!-- 音声コントロール -->
     <div class="voice-control">
@@ -292,7 +367,7 @@
       <div id="voice-status" class="status-text">VOICE SYSTEM: STANDBY</div>
     </div>
 
-    <!-- 以降、計算機能フォーム（前バージョンと同一） -->
+    <!-- 計算機能フォーム -->
     <div class="form-group">
       <div class="label"><div>表面：落とした秒数 / 突破秒数</div></div>
       <div class="grid-3">
@@ -357,74 +432,97 @@
   let frontSpeakCount = 0;
   let isVoiceActive = false;
   
-  // カメラ・録画用変数
+  // カメラ・録画管理用
   let mediaStream = null;
   let mediaRecorder = null;
   let recordedChunks = [];
+  let isRecording = false;
 
-  // ページ読み込み時に背面のメインカメラを起動する
-  window.addEventListener('DOMContentLoaded', async () => {
-    const video = document.getElementById('camera-view');
-    try {
-      // 背面カメラ(environment)を指定してストリームを取得
-      mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false // ゲーム音などを拾う場合はここをtrueにしますが負荷低減のため一旦falseにしています
-      });
-      video.srcObject = mediaStream;
-    } catch (err) {
-      console.error("Camera error:", err);
-      document.getElementById('camera-status').innerHTML = "CAMERA ERROR: CANNOT ACCESS";
+  // 撮影モード（全画面）の起動
+  async function launchCameraMode() {
+    const video = document.getElementById('camera-video');
+    document.getElementById('cameraModeScreen').style.display = 'block';
+    
+    // 音声認識状態のミニ表示を更新
+    updateMiniVoiceStatus();
+
+    if (!mediaStream) {
+      try {
+        // 最高画質、背面メインカメラを指定
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false // 負荷低減のため音声なし
+        });
+        video.srcObject = mediaStream;
+      } catch (err) {
+        console.error("Camera access error:", err);
+        alert("カメラの起動に失敗しました。権限を確認してください。");
+        closeCameraMode();
+      }
     }
-  });
+  }
+
+  // 撮影モードの終了
+  function closeCameraMode() {
+    stopRecording();
+    document.getElementById('cameraModeScreen').style.display = 'none';
+  }
+
+  // 録画ボタンのトグル処理
+  function toggleRecording() {
+    if (!isRecording) {
+      startRecording();
+    } else {
+      stopRecording();
+    }
+  }
 
   // 録画開始
   function startRecording() {
-    if (!mediaStream) {
-      alert("カメラが準備できていません。");
-      return;
-    }
+    if (!mediaStream) return;
     recordedChunks = [];
-    
-    // 一般的なMIMEタイプを選択
+    isRecording = true;
+
     let options = { mimeType: 'video/webm;codecs=vp9' };
     if (!MediaRecorder.isTypeSupported(options.mimeType)) {
       options = { mimeType: 'video/mp4' };
     }
 
-    try {
-      mediaRecorder = new MediaRecorder(mediaStream, options);
-    } catch (e) {
-      mediaRecorder = new MediaRecorder(mediaStream); // フォールバック
-    }
+    try { mediaRecorder = new MediaRecorder(mediaStream, options); } 
+    catch (e) { mediaRecorder = new MediaRecorder(mediaStream); }
 
-    mediaRecorder.ondataavailable = function(e) {
-      if (e.data && e.data.size > 0) {
-        recordedChunks.push(e.data);
-      }
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) recordedChunks.push(e.data);
     };
 
-    mediaRecorder.onstop = function() {
-      // 録画停止時に自動でダウンロード用リンクを生成して叩く
+    mediaRecorder.onstop = () => {
       const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       document.body.appendChild(a);
       a.style = 'display: none';
       a.href = url;
-      // ファイル名にタイムスタンプを付与
+      
       const now = new Date();
       const timeStr = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + "_" + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
       a.download = `breakout_play_${timeStr}.mp4`;
       a.click();
       window.URL.revokeObjectURL(url);
-      document.getElementById('camera-status').innerHTML = "VIDEO DOWNLOADED";
-      document.getElementById('rec-start').classList.remove('recording');
+
+      isRecording = false;
+      const recBtn = document.getElementById('overlay-rec-toggle');
+      recBtn.textContent = "REC START";
+      recBtn.classList.remove('recording');
     };
 
     mediaRecorder.start();
-    document.getElementById('rec-start').classList.add('recording');
-    document.getElementById('camera-status').innerHTML = "● RECORDING...";
+    const recBtn = document.getElementById('overlay-rec-toggle');
+    recBtn.textContent = "● STOP";
+    recBtn.classList.add('recording');
   }
 
   // 録画停止
@@ -434,7 +532,20 @@
     }
   }
 
-  // 以下、音声認識と計算処理（前バージョンと同一）
+  function updateMiniVoiceStatus() {
+    const miniVoice = document.getElementById('mini-voice-status');
+    if (isVoiceActive) {
+      miniVoice.textContent = "VOICE: ACTIVE";
+      miniVoice.style.borderColor = "var(--voice-active)";
+      miniVoice.style.color = "var(--voice-active)";
+    } else {
+      miniVoice.textContent = "VOICE: OFF";
+      miniVoice.style.borderColor = "#777";
+      miniVoice.style.color = "#777";
+    }
+  }
+
+  // --- 以下、計算ロジックと音声認識（共通） ---
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
 
@@ -456,6 +567,7 @@
       else {
         document.getElementById('voice-status').innerHTML = "VOICE SYSTEM: STANDBY";
         document.getElementById('voice-start').classList.remove('listening');
+        updateMiniVoiceStatus();
       }
     };
 
@@ -471,6 +583,7 @@
     document.getElementById('voice-status').innerHTML = "VOICE SYSTEM: LISTENING...";
     recognition.start();
     speakText("音声入力を開始します");
+    updateMiniVoiceStatus();
   }
 
   function stopVoiceRecognition() {
@@ -480,6 +593,7 @@
     recognition.stop();
     speakText("音声入力を終了します");
     allReset(); 
+    updateMiniVoiceStatus();
   }
 
   function parseSpeech(text) {
@@ -601,6 +715,9 @@
 
     const t2_display = t2.toFixed(2);
     document.getElementById('output').innerHTML = t2_display + " 秒";
+    
+    // 撮影モード（ミニ表示）のターゲット秒数も連動してリアルタイム更新
+    document.getElementById('mini-output').innerHTML = t2_display + " 秒";
 
     let targetS = (mode === 1) ? 0.5 : (mode === 2) ? 2.0 : 3.5;
     let requiredNext = (targetS - S) % 10; if (requiredNext < 0) requiredNext += 10;
